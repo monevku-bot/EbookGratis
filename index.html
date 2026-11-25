@@ -3,7 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Belajar dari Rasulullah — Perpustakaan Ebook Islami Gratis</title>
+  <title>Belajar dari Rasulullah — Perpustakaan Ebook PDF Islami Gratis</title>
+  <meta name="description" content="Perpustakaan digital ebook PDF Islami gratis: Kisah Para Nabi (Ibnu Katsir), Kiat Menggapai Hidup Berkah, Hak-Hak Nabi Muhammad ﷺ, dan koleksi Sirah &amp; Sunnah lainnya. Unduh gratis dengan dukungan sukarela via DANA.">
+  <meta name="keywords" content="ebook islami gratis, download ebook pdf islam, belajar dari rasulullah, kisah para nabi ibnu katsir pdf, kiat menggapai hidup berkah, hak nabi muhammad, sirah nabawiyah">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#064E3B">
+
+  <!-- Open Graph / WhatsApp / Facebook / Telegram Preview -->
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="id_ID">
+  <meta property="og:site_name" content="Belajar dari Rasulullah">
+  <meta property="og:title" content="Belajar dari Rasulullah — Perpustakaan Ebook PDF Islami Gratis">
+  <meta property="og:description" content="Kumpulan ebook PDF Islami pilihan seputar Sirah, Kisah Para Nabi, Akhlak, dan Sunnah. 100% gratis diunduh &amp; dibaca online.">
+
+  <!-- Twitter / X Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Belajar dari Rasulullah — Perpustakaan Ebook PDF Islami Gratis">
+  <meta name="twitter:description" content="Kumpulan ebook PDF Islami pilihan seputar Sirah, Kisah Para Nabi, Akhlak, dan Sunnah. 100% gratis diunduh &amp; dibaca online.">
+
+  <!-- Structured Data (JSON-LD) untuk Google Search -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "Belajar dari Rasulullah — Perpustakaan Ebook PDF Islami Gratis",
+    "inLanguage": "id-ID",
+    "description": "Perpustakaan digital ebook PDF Islami gratis bertema Sirah, Kisah Para Nabi, Akhlak, dan Sunnah Rasulullah ﷺ.",
+    "isAccessibleForFree": true,
+    "about": ["Sirah Nabawiyah", "Kisah Para Nabi", "Akhlak Islami", "Sunnah Rasulullah"]
+  }
+  </script>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
   <script>
@@ -134,6 +163,10 @@
             <i data-lucide="folder-open" class="w-4 h-4 text-emerald-300"></i>
             <span>Folder Drive</span>
           </a>
+          <button type="button" id="shareWaBtn" class="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm transition">
+            <i data-lucide="share-2" class="w-4 h-4"></i>
+            <span>Bagikan ke WA</span>
+          </button>
         </div>
       </div>
 
@@ -1148,6 +1181,13 @@
         } else if (action === 'download') {
           openDownloadModal(book);
         }
+      });
+
+      // Share to WhatsApp
+      document.getElementById('shareWaBtn').addEventListener('click', () => {
+        const pageUrl = (window.location.href && window.location.href.startsWith('http')) ? window.location.href : CONFIG.DRIVE_FOLDER_URL;
+        const msg = 'Assalamu\'alaikum! Ada perpustakaan ebook PDF Islami gratis "Belajar dari Rasulullah" (Kisah Para Nabi, Kiat Hidup Berkah, Hak-Hak Nabi ﷺ, dll). Bisa dibaca online & download gratis di sini:\n' + pageUrl;
+        window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener,noreferrer');
       });
 
       // Donation triggers
