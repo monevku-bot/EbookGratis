@@ -432,7 +432,7 @@
               <span>Salin Kode</span>
             </button>
           </div>
-          <pre id="gasCodeBlock" class="bg-slate-900 text-emerald-200 text-xs p-4 rounded-xl overflow-x-auto leading-relaxed font-mono">function doGet() {
+          <pre id="gasCodeBlock" class="bg-slate-900 text-emerald-200 text-xs p-4 rounded-xl overflow-x-auto leading-relaxed font-mono">function doGet(e) {
   var folderId = '15iejomrKMVhgBbmDgP0O4s74I90aW4qL';
   var folder = DriveApp.getFolderById(folderId);
   var files = folder.getFilesByType(MimeType.PDF);
@@ -448,8 +448,13 @@
       downloadUrl: 'https://drive.google.com/uc?export=download&id=' + f.getId()
     });
   }
-  return ContentService
-    .createTextOutput(JSON.stringify({ updatedAt: new Date().toISOString(), files: list }))
+  var payload = JSON.stringify({ updatedAt: new Date().toISOString(), files: list });
+  var cb = e &amp;&amp; e.parameter &amp;&amp; e.parameter.callback;
+  if (cb) {
+    return ContentService.createTextOutput(cb + '(' + payload + ');')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(payload)
     .setMimeType(ContentService.MimeType.JSON);
 }</pre>
         </div>
@@ -470,6 +475,9 @@
           <label for="gasUrlInput" class="block text-sm font-bold text-ink mb-1.5">Langkah 3: Tempel URL Web App Google Apps Script</label>
           <div class="flex flex-col sm:flex-row gap-2">
             <input id="gasUrlInput" type="url" placeholder="https://script.google.com/macros/s/.../exec" class="flex-1 px-3.5 py-2.5 rounded-xl bg-parchment border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600/30 focus:border-emeraldMid">
+            <button type="button" id="testGasUrlBtn" class="px-3.5 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-sm font-semibold transition shrink-0">
+              Tes URL
+            </button>
             <button type="button" id="saveGasUrlBtn" class="px-5 py-2.5 rounded-xl bg-emeraldDeep hover:bg-emeraldMid text-white text-sm font-bold transition shrink-0">
               Simpan &amp; Sinkronkan
             </button>
@@ -915,7 +923,48 @@
       showToast('QR Code DANA berhasil diunduh. Bisa langsung di-scan dari galeri aplikasi DANA.');
     }
 
-    // Live Sync from Google Drive via Apps Script Web App
+    // JSONP fallback for Google Apps Script (bypasses cross-origin redirect blocks)
+    function fetchViaJsonp(url) {
+      return new Promise((resolve, reject) => {
+        const cbName = '__bdrGasCb_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+        const script = document.createElement('script');
+        let settled = false;
+
+        const cleanup = () => {
+          if (script.parentNode) script.parentNode.removeChild(script);
+          try { delete window[cbName]; } catch (e) { window[cbName] = undefined; }
+        };
+
+        const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(new Error('Timeout JSONP'));
+        }, 10000);
+
+        window[cbName] = (data) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          cleanup();
+          resolve(data);
+        };
+
+        script.onerror = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          cleanup();
+          reject(new Error('JSONP load failed'));
+        };
+
+        const sep = url.includes('?') ? '&' : '?';
+        script.src = url + sep + 'callback=' + encodeURIComponent(cbName);
+        document.head.appendChild(script);
+      });
+    }
+
+    // Live Sync from Google Drive via Apps Script Web App (fetch + automatic JSONP fallback)
     async function syncFromDrive(silent = false) {
       const url = (state.gasUrl || '').trim();
       if (!url) {
@@ -926,20 +975,35 @@
         return;
       }
 
+      if (url.endsWith('/dev')) {
+        state.syncStatus = 'error';
+        renderStats();
+        if (!silent) {
+          showToast('URL berakhiran /dev tidak bisa diakses publik. Pakai URL /exec dari menu Terapkan (Deploy).');
+        }
+        return;
+      }
+
       const icon = document.getElementById('syncNowIcon');
       icon.classList.add('animate-spin');
       state.syncStatus = 'syncing';
       renderStats();
 
       try {
-        const res = await fetch(url, { method: 'GET' });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        const rawFiles = Array.isArray(data) ? data : (Array.isArray(data.files) ? data.files : []);
+        let data = null;
+        try {
+          const res = await fetch(url, { method: 'GET', redirect: 'follow', credentials: 'omit' });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          data = await res.json();
+        } catch (fetchErr) {
+          // Automatic JSONP fallback if fetch is blocked by CORS/redirect
+          data = await fetchViaJsonp(url);
+        }
+
+        const rawFiles = Array.isArray(data) ? data : (Array.isArray(data && data.files) ? data.files : []);
 
         if (rawFiles.length > 0) {
           const parsed = rawFiles.map(parseDrivePdfFile);
-          // Merge any curated books if not returned (keeps resilience)
           const ids = new Set(parsed.map(b => b.id));
           INITIAL_CURATED_BOOKS.forEach(cb => {
             if (!ids.has(cb.id)) parsed.push(cb);
@@ -958,7 +1022,7 @@
         state.syncStatus = 'error';
         renderStats();
         if (!silent) {
-          showToast('Gagal mengambil data dari Google Drive. Cek URL Apps Script & izin aksesnya.');
+          showToast('Gagal mengambil data. Pastikan Deploy disetel ke "Siapa saja (Anyone)", URL berakhiran /exec, dan pakai kode skrip terbaru.');
         }
       } finally {
         icon.classList.remove('animate-spin');
@@ -1109,6 +1173,15 @@
 
       document.getElementById('syncNowBtn').addEventListener('click', () => syncFromDrive(false));
       document.getElementById('copyGasCodeBtn').addEventListener('click', copyGasCode);
+
+      document.getElementById('testGasUrlBtn').addEventListener('click', () => {
+        const val = document.getElementById('gasUrlInput').value.trim();
+        if (!val || !val.startsWith('https://')) {
+          showToast('Masukkan URL https://script.google.com/macros/s/.../exec terlebih dahulu.');
+          return;
+        }
+        window.open(val, '_blank', 'noopener,noreferrer');
+      });
 
       document.getElementById('saveGasUrlBtn').addEventListener('click', () => {
         const val = document.getElementById('gasUrlInput').value.trim();
