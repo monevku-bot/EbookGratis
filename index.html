@@ -539,6 +539,21 @@
         downloadUrl: 'https://drive.google.com/uc?export=download&id=1Ek8xsqfFuxo-ioMM989mdSq4caxa7HXl',
         description: 'Kitab klasik monumentalis yang mengisahkan perjalanan dakwah, keteladanan, dan hikmah 31 Nabi dan Rasul dari Nabi Adam hingga Nabi Isa \'alaihimussalam bersumber dari Al-Qur\'an dan Hadits Shahih.',
         accent: 'from-amber-900 via-emerald-950 to-emerald-900',
+      },
+      {
+        id: '1rznRWjNt6FLYmP0H3OQsi4OlYb2YRfYq',
+        title: 'Hak-Hak Nabi Muhammad ﷺ',
+        author: 'Syaikh Shalih bin Abdul Aziz Sindi',
+        category: 'Sirah & Kisah Nabi',
+        fileName: 'Hak_Hak_Nabi_Muhammad_SAW_Syaikh_Shalih_Bin_Abdul_Aziz_Sindi.pdf',
+        fileSize: 2907781,
+        pages: '52 halaman',
+        edition: 'Edisi Al-Muharram 1448 H',
+        modifiedTime: '2026-11-25T06:56:00.381Z',
+        viewUrl: 'https://drive.google.com/file/d/1rznRWjNt6FLYmP0H3OQsi4OlYb2YRfYq/view?usp=drivesdk',
+        downloadUrl: 'https://drive.google.com/uc?export=download&id=1rznRWjNt6FLYmP0H3OQsi4OlYb2YRfYq',
+        description: 'Ringkasan kitab Al-Mushaffa min Huquqil Musthafa yang membahas 4 hak agung Nabi Muhammad ﷺ atas umatnya: beriman kepada kenabian beliau, mencintai, memuliakan, serta menaati dan mengikuti sunnahnya.',
+        accent: 'from-teal-900 via-emerald-900 to-slate-900',
       }
     ];
 
@@ -1003,10 +1018,18 @@
         const rawFiles = Array.isArray(data) ? data : (Array.isArray(data && data.files) ? data.files : []);
 
         if (rawFiles.length > 0) {
-          const parsed = rawFiles.map(parseDrivePdfFile);
+          const seenBaseNames = new Set();
+          const parsed = [];
+          rawFiles.forEach(rf => {
+            const normName = (rf.fileName || rf.name || '').replace(/\s*\(\d+\)(?=\.pdf$)/i, '').toLowerCase().trim();
+            if (normName && seenBaseNames.has(normName)) return;
+            if (normName) seenBaseNames.add(normName);
+            parsed.push(parseDrivePdfFile(rf));
+          });
           const ids = new Set(parsed.map(b => b.id));
           INITIAL_CURATED_BOOKS.forEach(cb => {
-            if (!ids.has(cb.id)) parsed.push(cb);
+            const normCurated = (cb.fileName || '').replace(/\s*\(\d+\)(?=\.pdf$)/i, '').toLowerCase().trim();
+            if (!ids.has(cb.id) && !seenBaseNames.has(normCurated)) parsed.push(cb);
           });
           state.books = parsed;
           writeStorage(STORAGE_KEYS.CACHED_BOOKS, parsed);
@@ -1019,10 +1042,15 @@
           showToast('Berhasil sinkronisasi! Total ' + state.books.length + ' ebook PDF dari Google Drive.');
         }
       } catch (err) {
-        state.syncStatus = 'error';
+        const isLocalPreview = !window.location.hostname || window.location.protocol === 'about:' || window.location.origin === 'null';
+        state.syncStatus = isLocalPreview ? 'curated' : 'error';
         renderStats();
         if (!silent) {
-          showToast('Gagal mengambil data. Pastikan Deploy disetel ke "Siapa saja (Anyone)", URL berakhiran /exec, dan pakai kode skrip terbaru.');
+          if (isLocalPreview) {
+            showToast('Mode pratinjau membatasi koneksi langsung ke Drive. Download file HTML ini lalu buka di Chrome atau GitHub Pages agar Auto-Sync jalan otomatis.');
+          } else {
+            showToast('Gagal mengambil data. Pastikan Deploy disetel ke "Siapa saja (Anyone)", URL berakhiran /exec, dan pakai kode skrip terbaru.');
+          }
         }
       } finally {
         icon.classList.remove('animate-spin');
